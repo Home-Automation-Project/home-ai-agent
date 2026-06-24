@@ -1,0 +1,86 @@
+# Traefik Static Configuration
+# This file defines TLS/SSL certificates and global Traefik settings
+
+# Global settings
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+# API configuration
+api:
+  insecure: true
+  dashboard: true
+  debug: false
+
+# Entrypoints (HTTP/HTTPS listeners)
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entrypoint:
+          main: websecure
+          scheme: https
+
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        options: default
+        certResolver: selfsigned
+        domains:
+          - main: "lthome.us"
+            sans:
+              - "*.lthome.us"
+
+  traefik:
+    address: ":8080"
+
+# Providers (container/service discovery)
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: household-internal
+
+  # File provider for dynamic configuration
+  file:
+    filename: /traefik/traefik.yml
+    watch: true
+
+# Certificate resolvers
+certificatesResolvers:
+  selfsigned:
+    acme:
+      email: "admin@lthome.us"
+      storage: /acme.json
+      # Self-signed certificate (no validation)
+      caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"
+      tlsChallenge:
+        {}
+      # Or use HTTP challenge if needed:
+      # httpChallenge:
+      #   entryPoint: web
+
+# TLS Options
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      cipherSuites:
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+        - TLS_AES_128_GCM_SHA256
+        - TLS_AES_256_GCM_SHA384
+        - TLS_CHACHA20_POLY1305_SHA256
+
+# Logging
+log:
+  level: INFO
+  filePath: /dev/stdout
+
+# Access logs
+accessLog:
+  filePath: /dev/stdout
+  format: json
