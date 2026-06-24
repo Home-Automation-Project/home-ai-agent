@@ -1,0 +1,309 @@
+# Integration Configuration
+# Defines external service endpoints, rate limits, retry policies, and timeouts
+
+integrations:
+  
+  # ===== Home Assistant =====
+  home_assistant:
+    enabled: true
+    base_url: "${HOME_ASSISTANT_URL}"
+    api_token: "${HOME_ASSISTANT_TOKEN}"
+    api_version: "2024.1"
+    
+    endpoints:
+      list_entities: "/api/states"
+      call_service: "/api/services/{domain}/{service}"
+      get_history: "/api/history/period/{datetime}?entity_id={entity_id}"
+      list_automations: "/api/automations"
+      trigger_automation: "/api/automations/{automation_id}/trigger"
+    
+    rate_limit:
+      requests_per_minute: 60
+      requests_per_second: 2
+    
+    timeout_seconds: 10
+    
+    retry_policy:
+      max_retries: 3
+      backoff_multiplier: 2
+      initial_delay_ms: 100
+    
+    ssl_verify: true
+    
+    safe_operations:
+      - query_entity_states
+      - query_automations
+      - list_services
+    
+    unsafe_operations:
+      - call_service
+      - unlock_door
+      - disable_security
+  
+  # ===== Google Calendar =====
+  google_calendar:
+    enabled: true
+    credentials_file: "${GOOGLE_APPLICATION_CREDENTIALS}"
+    calendar_id: "${GOOGLE_CALENDAR_ID}"
+    api_version: "v3"
+    
+    endpoints:
+      list_events: "https://www.googleapis.com/calendar/v3/calendars/{calendarId}/events"
+      get_event: "https://www.googleapis.com/calendar/v3/calendars/{calendarId}/events/{eventId}"
+      create_event: "https://www.googleapis.com/calendar/v3/calendars/{calendarId}/events"
+      update_event: "https://www.googleapis.com/calendar/v3/calendars/{calendarId}/events/{eventId}"
+      delete_event: "https://www.googleapis.com/calendar/v3/calendars/{calendarId}/events/{eventId}"
+    
+    rate_limit:
+      requests_per_minute: 100
+      requests_per_second: 1
+    
+    timeout_seconds: 15
+    
+    retry_policy:
+      max_retries: 3
+      backoff_multiplier: 2
+      initial_delay_ms: 100
+    
+    scopes:
+      - "https://www.googleapis.com/auth/calendar.readonly"
+      - "https://www.googleapis.com/auth/calendar"
+  
+  # ===== Gmail =====
+  gmail:
+    enabled: true
+    credentials_file: "${GOOGLE_APPLICATION_CREDENTIALS}"
+    user_email: "${GOOGLE_GMAIL_ADDRESS}"
+    api_version: "v1"
+    
+    endpoints:
+      list_messages: "https://www.googleapis.com/gmail/v1/users/me/messages"
+      get_message: "https://www.googleapis.com/gmail/v1/users/me/messages/{id}"
+      send_message: "https://www.googleapis.com/gmail/v1/users/me/messages/send"
+      create_draft: "https://www.googleapis.com/gmail/v1/users/me/drafts"
+      search: "https://www.googleapis.com/gmail/v1/users/me/messages"
+    
+    rate_limit:
+      requests_per_minute: 100
+    
+    timeout_seconds: 15
+    
+    retry_policy:
+      max_retries: 3
+      backoff_multiplier: 2
+      initial_delay_ms: 100
+    
+    scopes:
+      - "https://www.googleapis.com/auth/gmail.readonly"
+      - "https://www.googleapis.com/auth/gmail.send"
+  
+  # ===== Docker =====
+  docker:
+    enabled: true
+    
+    hosts:
+      local:
+        url: "${DOCKER_HOST_1}"
+        name: "Local Docker"
+      # Add more hosts as needed
+    
+    endpoints:
+      list_containers: "/containers/json"
+      get_container_stats: "/containers/{id}/stats"
+      get_logs: "/containers/{id}/logs"
+      restart_container: "/containers/{id}/restart"
+      stop_container: "/containers/{id}/stop"
+    
+    rate_limit:
+      requests_per_minute: 120
+    
+    timeout_seconds: 10
+    
+    retry_policy:
+      max_retries: 2
+      backoff_multiplier: 2
+      initial_delay_ms: 50
+    
+    allowlist_restart:
+      - "household-api"
+      - "redis"
+    
+    dangerous_operations:
+      - "stop_container"
+      - "remove_container"
+      - "restart_postgres"
+  
+  # ===== Grocy (Grocery Management) =====
+  grocy:
+    enabled: true
+    base_url: "${GROCY_API_URL}"
+    api_key: "${GROCY_API_KEY}"
+    api_version: "v1"
+    
+    endpoints:
+      list_products: "/api/products"
+      search_products: "/api/search?query={query}"
+      get_inventory: "/api/stock"
+      get_expiring_products: "/api/stock/entries"
+      add_product: "/api/products"
+      consume_product: "/api/stock/entries/{id}/consume"
+      purchase_product: "/api/stock/entries"
+    
+    rate_limit:
+      requests_per_minute: 60
+    
+    timeout_seconds: 10
+    
+    ssl_verify: false  # Usually self-signed in home lab
+  
+  # ===== Water Usage Monitoring =====
+  water_api:
+    enabled: true
+    base_url: "${WATER_API_URL}"
+    api_key: "${WATER_API_KEY}"
+    
+    endpoints:
+      current_usage: "/api/water/current"
+      daily_usage: "/api/water/daily?date={date}"
+      hourly_usage: "/api/water/hourly?date={date}"
+      monthly_summary: "/api/water/monthly?month={month}"
+      leak_alerts: "/api/water/alerts"
+    
+    rate_limit:
+      requests_per_minute: 30
+    
+    timeout_seconds: 10
+    
+    polling_interval_seconds: 300  # Check every 5 minutes
+  
+  # ===== Kavita (Comics Library) =====
+  kavita:
+    enabled: true
+    base_url: "${KAVITA_URL}"
+    api_key: "${KAVITA_API_KEY}"
+    
+    endpoints:
+      search: "/api/book/search?query={query}"
+      list_series: "/api/series"
+      get_series: "/api/series/{id}"
+      list_collections: "/api/collections"
+      user_reading_list: "/api/user/reading-list"
+    
+    rate_limit:
+      requests_per_minute: 60
+    
+    timeout_seconds: 10
+    
+    ssl_verify: false
+  
+  # ===== Calibre-Web (Books Library) =====
+  calibre_web:
+    enabled: true
+    base_url: "${CALIBRE_WEB_URL}"
+    api_key: "${CALIBRE_WEB_API_KEY}"
+    
+    endpoints:
+      search: "/api/books?q={query}"
+      list_books: "/api/books"
+      get_book: "/api/books/{id}"
+      list_series: "/api/series"
+      user_shelf: "/api/user/shelf"
+    
+    rate_limit:
+      requests_per_minute: 60
+    
+    timeout_seconds: 10
+    
+    ssl_verify: false
+  
+  # ===== Audiobookshelf (Audiobooks Library) =====
+  audiobookshelf:
+    enabled: true
+    base_url: "${AUDIOBOOKSHELF_URL}"
+    api_key: "${AUDIOBOOKSHELF_API_KEY}"
+    
+    endpoints:
+      search: "/api/search?q={query}"
+      list_library: "/api/libraries"
+      get_item: "/api/items/{id}"
+      user_library: "/api/me/library"
+      progress: "/api/me/progress/{id}"
+    
+    rate_limit:
+      requests_per_minute: 60
+    
+    timeout_seconds: 10
+    
+    ssl_verify: false
+  
+  # ===== OpenAI (LLM Backend) =====
+  openai:
+    enabled: true
+    api_key: "${OPENAI_API_KEY}"
+    model: "${OPENAI_MODEL}"
+    api_base: "https://api.openai.com/v1"
+    
+    models:
+      default: "gpt-4"
+      fast: "gpt-4o"
+      legacy: "gpt-3.5-turbo"
+    
+    rate_limit:
+      requests_per_minute: 60
+      tokens_per_minute: 40000
+    
+    timeout_seconds: 30
+    
+    retry_policy:
+      max_retries: 3
+      backoff_multiplier: 2
+      initial_delay_ms: 100
+    
+    temperature: 0.7
+    max_tokens: 2000
+
+# Global Configuration
+global:
+  # Default timeouts
+  default_timeout_seconds: 10
+  long_operation_timeout_seconds: 60
+  
+  # SSL/TLS
+  ssl_verify_default: false  # Home lab often uses self-signed certs
+  
+  # Proxy (if needed)
+  http_proxy: ""
+  https_proxy: ""
+  no_proxy: "localhost,127.0.0.1,redis,postgres"
+  
+  # Logging
+  log_api_requests: true
+  log_api_responses: true
+  log_sensitive_data: false  # Never log passwords, tokens, etc.
+  
+  # Circuit breaker (prevent cascading failures)
+  circuit_breaker_enabled: true
+  circuit_breaker_failure_threshold: 5
+  circuit_breaker_timeout_seconds: 60
+  
+  # Caching
+  cache_enabled: true
+  cache_ttl_seconds: 300
+  cache_backend: "redis"
+
+# Mock Data Configuration (for development/testing)
+mock:
+  enabled: false
+  
+  home_assistant:
+    mock_entities: 50
+    mock_automations: 10
+  
+  calendar:
+    mock_events: 20
+  
+  grocery:
+    mock_items: 100
+  
+  water:
+    mock_usage_gallons: 45.5

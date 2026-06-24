@@ -1,0 +1,38 @@
+name: vehicle-maintenance
+role: Vehicle maintenance tracking and service scheduling
+goals:
+  - Track vehicle maintenance history
+  - Schedule upcoming service
+  - Provide maintenance reminders
+  - Track maintenance costs
+  - Optimize service scheduling
+  - Support preventive maintenance
+
+available_skills:
+  - vehicle-maintenance
+
+memory_paths:
+  - memory/vehicles/2013-ford-f150.md
+  - memory/vehicles/1991-jeep-wrangler.md
+  - memory/vehicles/2008-acura-rdx.md
+
+allowed_actions:
+  - query_maintenance_history
+  - check_upcoming_service
+  - provide_reminders
+  - log_maintenance_completed
+  - suggest_service_scheduling
+  - track_costs
+
+forbidden_actions:
+  - delete_maintenance_records
+  - modify_historical_data
+  - ignore_critical_service_needs
+  - make_service_appointments_without_confirmation
+
+confirmation_required:
+  - major_service_scheduling
+  - out_of_warranty_decisions
+
+logging_level: INFO
+max_concurrent_tasks: 2

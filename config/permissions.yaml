@@ -1,0 +1,235 @@
+# Skill Permissions Matrix
+# Defines read/write/destructive permissions per skill
+#
+# Each skill can have:
+#   read: Can query external systems (always allowed unless explicitly denied)
+#   write: Can modify non-critical state (requires explicit allow)
+#   destructive: Requires confirmation for database changes, service restarts, etc.
+
+skills:
+  home-assistant:
+    category: home-automation
+    read:
+      - query_entity_states
+      - query_automations
+      - query_scenes
+    write:
+      - call_service
+      - toggle_entity
+      - set_climate_temperature
+    destructive: []
+    restrictions:
+      - "Cannot unlock doors without explicit confirmation"
+      - "Cannot disable security systems without explicit confirmation"
+      - "Cannot modify safety-critical automations"
+
+  google-calendar:
+    category: productivity
+    read:
+      - list_events
+      - get_event_details
+      - query_free_busy
+    write:
+      - create_event
+      - update_event
+      - delete_event
+    destructive:
+      - delete_event
+    restrictions:
+      - "All write operations require confirmation"
+
+  gmail-triage:
+    category: productivity
+    read:
+      - list_messages
+      - get_message
+      - search_messages
+    write:
+      - create_draft
+      - mark_as_read
+      - add_label
+    destructive:
+      - send_email
+      - delete_message
+      - archive_message
+    restrictions:
+      - "Sending emails requires explicit confirmation"
+      - "Deleting emails requires explicit confirmation"
+
+  docker-health:
+    category: sysadmin
+    read:
+      - list_containers
+      - get_container_stats
+      - get_logs
+      - get_health
+    write: []
+    destructive:
+      - restart_container
+      - stop_container
+      - remove_container
+    restrictions:
+      - "Only restart containers in allowlist (configured separately)"
+      - "Stopping/removing containers requires explicit confirmation"
+
+  library-systems:
+    category: library
+    read:
+      - search_books
+      - search_comics
+      - search_audiobooks
+      - get_user_profile
+    write:
+      - add_to_reading_list
+      - mark_as_read
+      - update_user_preferences
+    destructive: []
+    restrictions:
+      - "All read operations are safe"
+      - "Write operations are safe (personal preference updates)"
+
+  grocery-inventory:
+    category: food
+    read:
+      - list_inventory
+      - get_item_details
+      - query_expiration
+      - get_pantry_state
+    write:
+      - add_item
+      - update_quantity
+      - mark_as_consumed
+      - set_expiration
+    destructive:
+      - delete_item
+      - clear_inventory
+    restrictions:
+      - "Deleting items requires confirmation"
+
+  meal-planning:
+    category: food
+    read:
+      - query_preferences
+      - get_dietary_restrictions
+      - list_recipes
+    write:
+      - add_preference
+      - update_dietary_info
+      - save_recipe
+    destructive: []
+    restrictions:
+      - "All operations are safe (personal preferences)"
+
+  water-usage-monitor:
+    category: utilities
+    read:
+      - query_usage_history
+      - get_current_usage
+      - get_flow_rate
+    write:
+      - create_alert_threshold
+      - acknowledge_alert
+    destructive: []
+    restrictions:
+      - "All operations are read-only or threshold management"
+
+  vehicle-maintenance:
+    category: maintenance
+    read:
+      - query_maintenance_history
+      - get_schedule
+      - get_upcoming_tasks
+    write:
+      - log_maintenance
+      - update_schedule
+      - mark_task_complete
+    destructive:
+      - delete_record
+    restrictions:
+      - "Deleting records requires confirmation"
+
+  household-maintenance:
+    category: maintenance
+    read:
+      - query_tasks
+      - get_task_details
+      - get_schedule
+    write:
+      - add_task
+      - update_task
+      - mark_complete
+    destructive:
+      - delete_task
+    restrictions:
+      - "Deleting tasks requires confirmation"
+
+  family-knowledge-base:
+    category: reference
+    read:
+      - query_knowledge_base
+      - get_page
+      - search
+    write:
+      - create_page
+      - update_page
+      - add_reference
+    destructive:
+      - delete_page
+    restrictions:
+      - "Deleting pages requires confirmation"
+
+# Default permission policy
+defaults:
+  # If a skill attempts an action not explicitly listed, default to:
+  allow_unlisted_read_operations: true
+  allow_unlisted_write_operations: false
+  allow_unlisted_destructive_operations: false
+
+# Allowlists/Denylists
+allowlist:
+  docker_restart:
+    # Only these containers can be restarted without special approval
+    - household-api
+    - redis
+    # Note: postgres should not be restarted without approval
+  
+  home_assistant_modifications:
+    # Only these automations can be modified by agents
+    - nightly_summary
+    - morning_briefing
+    # Security automations (locks, etc.) are always denied
+
+denylist:
+  # Actions that are NEVER allowed
+  home_assistant:
+    - unlock_doors
+    - disable_security
+    - disarm_alarm
+  
+  calendar:
+    - modify_birthdays
+    - modify_anniversaries
+
+# Escalation matrix
+escalation:
+  low_risk:
+    # Read operations, safe write operations
+    confirmation_required: false
+    audit_log: true
+  
+  medium_risk:
+    # Write operations to external services
+    confirmation_required: true
+    audit_log: true
+  
+  high_risk:
+    # Destructive operations, service restart
+    confirmation_required: true
+    audit_log: true
+    require_user_presence: false  # Can be approved remotely
+  
+  critical_risk:
+    # Security-related operations
+    confirmation_required: true
+    audit_log: true
+    require_user_presence: true  # Must be present to approve

@@ -1,0 +1,278 @@
+# Audit Policy
+# Defines what should be logged, retention, and alert thresholds
+
+audit_policy:
+  # ===== What to Log =====
+  
+  logging_enabled: true
+  
+  log_categories:
+    # All agent invocations
+    agent_invocation:
+      enabled: true
+      log_level: INFO
+      include_fields:
+        - agent_name
+        - agent_role
+        - timestamp
+        - invocation_method  # REST, CLI, scheduled, etc.
+        - parameters
+        - duration_ms
+    
+    # All skill executions
+    skill_execution:
+      enabled: true
+      log_level: INFO
+      include_fields:
+        - skill_name
+        - agent_name
+        - timestamp
+        - action_name
+        - parameters
+        - result  # success / failure
+        - error_message
+        - duration_ms
+    
+    # All confirmations
+    confirmation_request:
+      enabled: true
+      log_level: WARN
+      include_fields:
+        - agent_name
+        - skill_name
+        - action_name
+        - action_details
+        - timestamp
+        - user_response  # approved / denied / timeout
+        - response_time_seconds
+    
+    # All external API calls
+    external_api_call:
+      enabled: true
+      log_level: DEBUG
+      include_fields:
+        - api_name  # home_assistant, calendar, docker, etc.
+        - method  # GET, POST, etc.
+        - endpoint
+        - status_code
+        - timestamp
+        - duration_ms
+        - parameters_hash  # Hash of parameters (avoid logging sensitive data)
+    
+    # All memory reads/writes
+    memory_access:
+      enabled: true
+      log_level: DEBUG
+      include_fields:
+        - access_type  # read / write / delete
+        - memory_path
+        - agent_name
+        - timestamp
+        - data_size_bytes
+    
+    # All database writes
+    database_write:
+      enabled: true
+      log_level: INFO
+      include_fields:
+        - table_name
+        - operation  # insert / update / delete
+        - agent_name
+        - timestamp
+        - affected_rows
+    
+    # All errors and exceptions
+    error_event:
+      enabled: true
+      log_level: ERROR
+      include_fields:
+        - error_type
+        - error_message
+        - stack_trace
+        - agent_name
+        - skill_name
+        - timestamp
+        - context
+    
+    # Security-relevant events
+    security_event:
+      enabled: true
+      log_level: CRITICAL
+      include_fields:
+        - event_type  # unauthorized_access, failed_confirmation, etc.
+        - agent_name
+        - user_name
+        - timestamp
+        - details
+    
+    # Resource-intensive operations
+    resource_event:
+      enabled: true
+      log_level: WARN
+      include_fields:
+        - resource_type  # cpu, memory, disk, network
+        - metric_name
+        - value
+        - threshold_exceeded: true
+        - timestamp
+
+  # ===== Log Retention =====
+  
+  retention:
+    # Keep logs for this many days
+    default_retention_days: 90
+    
+    # Category-specific retention
+    per_category:
+      agent_invocation: 90
+      skill_execution: 90
+      confirmation_request: 180  # Keep longer for audit purposes
+      external_api_call: 30  # API calls less critical
+      memory_access: 30
+      database_write: 180
+      error_event: 180
+      security_event: 365  # Keep security events longer
+      resource_event: 30
+    
+    # Archival
+    archive_after_days: 90
+    archive_location: /var/log/household-ai/archive/
+    archive_format: gzip  # or tar, zip, etc.
+
+  # ===== Log Output Format =====
+  
+  format: json  # json, csv, syslog, or structured
+  
+  json_format:
+    include_timestamp: true
+    timestamp_format: "2006-01-02T15:04:05Z07:00"  # RFC3339
+    include_source: true  # File, line number
+    include_trace_id: true  # For distributed tracing
+
+  # ===== Log Storage =====
+  
+  storage:
+    # Primary: Postgres (queryable)
+    postgres:
+      enabled: true
+      table_name: audit_logs
+      connection: "postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@postgres:5432/{POSTGRES_DB}"
+    
+    # Secondary: File logging (backup, offline access)
+    file:
+      enabled: true
+      directory: /var/log/household-ai/
+      filename_template: "{date}_household-ai.log"
+      rotation: daily
+      compression: gzip
+
+  # ===== Alert Thresholds =====
+  
+  alerts:
+    # Error rate threshold
+    error_rate_threshold_percent: 5
+    error_rate_window_minutes: 60
+    error_rate_alert_level: WARN
+    
+    # Confirmation rejection rate
+    confirmation_denial_threshold_percent: 30
+    confirmation_denial_window_hours: 24
+    confirmation_denial_alert_level: INFO
+    
+    # Unauthorized access attempts
+    unauthorized_access_threshold: 3
+    unauthorized_access_window_minutes: 15
+    unauthorized_access_alert_level: CRITICAL
+    
+    # Slow operation detection
+    slow_operation_threshold_ms: 5000
+    slow_operation_alert_level: WARN
+    
+    # Large data transfer
+    large_data_transfer_threshold_mb: 100
+    large_data_transfer_alert_level: INFO
+
+  # ===== Alerting Mechanism =====
+  
+  alerting:
+    enabled: true
+    
+    # Where to send alerts
+    channels:
+      console:
+        enabled: true
+        level: CRITICAL
+      
+      email:
+        enabled: false  # Set to true to enable
+        recipients: ["admin@household"]
+        level: CRITICAL
+      
+      slack:
+        enabled: false  # Set to true to enable
+        webhook_url: "${SLACK_WEBHOOK_URL}"
+        level: WARN
+      
+      syslog:
+        enabled: false
+        host: localhost
+        port: 514
+        level: ERROR
+    
+    # Alert templates
+    alert_template: |
+      Household AI Alert
+      ==================
+      Level: {alert_level}
+      Time: {timestamp}
+      Type: {alert_type}
+      Details: {alert_details}
+      
+      Agent: {agent_name}
+      Action: {action_name}
+
+  # ===== Special Audit Cases =====
+  
+  special_cases:
+    # Log all confirmation requests with full context
+    always_log_confirmations: true
+    
+    # Log all security-related operations
+    always_log_security_events: true
+    
+    # Log all external API errors
+    always_log_api_errors: true
+    
+    # Log memory writes for forensics
+    always_log_memory_writes: true
+    
+    # Log failed attempts to access forbidden resources
+    always_log_denied_access: true
+
+  # ===== Data Anonymization (for privacy) =====
+  
+  anonymization:
+    enabled: false  # Set to true for GDPR compliance, etc.
+    
+    # Which fields to anonymize
+    anonymize_fields:
+      - email_addresses
+      - phone_numbers
+      - personal_names
+    
+    # Anonymization method
+    method: hash  # hash, mask, remove
+    salt: "${AUDIT_ANONYMIZATION_SALT}"
+
+  # ===== Compliance =====
+  
+  compliance:
+    # GDPR: Right to be forgotten
+    gdpr_right_to_be_forgotten_enabled: true
+    gdpr_retention_after_deletion_days: 30
+    
+    # HIPAA (if storing health data)
+    hipaa_enabled: false
+    
+    # SOC2
+    soc2_enabled: false

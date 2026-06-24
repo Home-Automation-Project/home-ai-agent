@@ -1,0 +1,181 @@
+version: '3.8'
+
+services:
+  # ====== PostgreSQL: Audit Logs and Persistent State ======
+  postgres:
+    image: postgres:15-alpine
+    container_name: household-ai-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./services/household-api/app/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - household-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ====== Redis: Pub/Sub, Task Queues, Caching ======
+  redis:
+    image: redis:7-alpine
+    container_name: household-ai-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - household-internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ====== OpenClaw: Agent Orchestrator ======
+  openclaw:
+    image: ${OPENCLAW_IMAGE:-lantern-ai/openclaw:latest}
+    container_name: household-ai-openclaw
+    environment:
+      OPENCLAW_LOG_LEVEL: ${OPENCLAW_LOG_LEVEL:-INFO}
+      OPENCLAW_API_PORT: 8001
+      OPENCLAW_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      OPENCLAW_REDIS_URL: redis://redis:6379
+      OPENCLAW_AGENTS_PATH: /app/agents
+      OPENCLAW_SKILLS_PATH: /app/skills
+      OPENCLAW_MEMORY_PATH: /app/memory
+    ports:
+      - "8001:8001"
+    volumes:
+      # OpenClaw internal config and state persistence (~/.openclaw/openclaw.json)
+      - openclaw_data:/root/.openclaw
+      # Shared agents config
+      - ./agents:/app/agents:ro
+      # Shared skills
+      - ./skills:/app/skills:ro
+      # Shared memory
+      - ./memory:/app/memory:rw
+      # Configuration
+      - ./config:/app/config:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - household-internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ====== FastAPI: Integration Gateway ======
+  household-api:
+    build:
+      context: ./services/household-api
+      dockerfile: Dockerfile
+    container_name: household-ai-api
+    environment:
+      API_HOST: ${API_HOST}
+      API_PORT: ${API_PORT}
+      LOG_LEVEL: ${LOG_LEVEL}
+      OPENCLAW_BASE_URL: http://openclaw:8001
+      OPENCLAW_API_KEY: ${OPENCLAW_API_KEY}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_URL: redis://redis:6379
+      HOME_ASSISTANT_URL: ${HOME_ASSISTANT_URL}
+      HOME_ASSISTANT_TOKEN: ${HOME_ASSISTANT_TOKEN}
+      GOOGLE_CALENDAR_ID: ${GOOGLE_CALENDAR_ID}
+      GOOGLE_GMAIL_ADDRESS: ${GOOGLE_GMAIL_ADDRESS}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL}
+      GROCY_API_URL: ${GROCY_API_URL}
+      GROCY_API_KEY: ${GROCY_API_KEY}
+      WATER_API_URL: ${WATER_API_URL}
+      WATER_API_KEY: ${WATER_API_KEY}
+      KAVITA_URL: ${KAVITA_URL}
+      KAVITA_API_KEY: ${KAVITA_API_KEY}
+      CALIBRE_WEB_URL: ${CALIBRE_WEB_URL}
+      CALIBRE_WEB_API_KEY: ${CALIBRE_WEB_API_KEY}
+      AUDIOBOOKSHELF_URL: ${AUDIOBOOKSHELF_URL}
+      AUDIOBOOKSHELF_API_KEY: ${AUDIOBOOKSHELF_API_KEY}
+      MOCK_INTEGRATIONS: ${MOCK_INTEGRATIONS}
+      AUDIT_LOG_ENABLED: ${AUDIT_LOG_ENABLED}
+      CONFIRMATION_TIMEOUT_SECONDS: ${CONFIRMATION_TIMEOUT_SECONDS}
+    ports:
+      - "8000:8000"
+    volumes:
+      # Shared memory accessible to agents
+      - ./memory:/app/memory:rw
+      # Shared skills accessible to agents
+      - ./skills:/app/skills:ro
+      # Shared agents config
+      - ./agents:/app/agents:ro
+      # Configuration
+      - ./config:/app/config:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      openclaw:
+        condition: service_healthy
+    networks:
+      - household-internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  openclaw_data:
+    driver: local
+
+networks:
+  household-internal:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16

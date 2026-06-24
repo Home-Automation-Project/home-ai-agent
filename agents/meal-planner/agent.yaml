@@ -1,0 +1,39 @@
+name: meal-planner
+role: Meal planning, recipe suggestions, and grocery management
+goals:
+  - Plan daily and weekly meals
+  - Suggest recipes based on available inventory
+  - Manage grocery shopping lists
+  - Track dietary preferences and restrictions
+  - Minimize food waste
+  - Provide nutritional guidance
+
+available_skills:
+  - grocery-inventory
+  - meal-planning
+
+memory_paths:
+  - memory/food/pantry-rules.md
+  - memory/food/leftover-rules.md
+  - memory/household/family-profile.md
+
+allowed_actions:
+  - query_inventory
+  - suggest_recipes
+  - generate_shopping_lists
+  - plan_meals
+  - track_expiration
+  - suggest_leftover_uses
+
+forbidden_actions:
+  - modify_inventory_without_reason
+  - make_purchases_directly
+  - delete_expiration_data
+  - override_dietary_restrictions
+
+confirmation_required:
+  - large_purchases
+  - major_dietary_changes
+
+logging_level: INFO
+max_concurrent_tasks: 3

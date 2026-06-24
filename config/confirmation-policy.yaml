@@ -1,0 +1,172 @@
+# Confirmation Policy
+# Defines which actions require explicit user confirmation before execution
+#
+# Confirmation Model: CLI Prompt
+#   - Agent requests confirmation via household-api endpoint
+#   - CLI displays prompt to user
+#   - User enters yes/no (or timeout after CONFIRMATION_TIMEOUT_SECONDS)
+#   - Result is logged to audit trail
+
+confirmation_policy:
+  # ===== High-Priority Confirmations (Always Required) =====
+  
+  # Email Operations
+  email:
+    send_email: true
+    send_calendar_reminder: true
+    send_maintenance_alert: true
+    timeout_seconds: 300  # 5 minutes
+    
+  # Calendar Modifications
+  calendar:
+    create_event: true
+    modify_event: true
+    delete_event: true
+    create_recurring_event: true
+    timeout_seconds: 300
+  
+  # Home Assistant Safety-Critical Changes
+  home_assistant:
+    unlock_door: true
+    lock_door: true
+    disable_security: true
+    arm_alarm: true
+    disarm_alarm: true
+    set_thermostat_temperature:
+      # Only require confirmation if changing by more than 3 degrees F
+      condition: "abs(new_temp - current_temp) > 3"
+    call_service: false  # Most services don't require confirmation
+    timeout_seconds: 300
+  
+  # Docker Service Management
+  docker:
+    restart_container: true
+    stop_container: true
+    remove_container: true
+    restart_service: true
+    timeout_seconds: 300
+  
+  # Destructive Operations
+  data_operations:
+    delete_record: true
+    delete_item: true
+    delete_event: true
+    clear_inventory: true
+    timeout_seconds: 300
+  
+  # ===== Medium-Priority Confirmations (Conditional) =====
+  
+  # Calendar Operations (some cases)
+  calendar_conditional:
+    create_event:
+      # Require confirmation only if creating during night hours or for other people
+      condition: "(hour < 6 or hour > 22) or (attendees.count > 1)"
+  
+  # Grocery/Food Operations
+  grocery:
+    delete_item: true
+    mark_as_consumed: false  # Safe
+    add_item: false  # Safe
+    timeout_seconds: 60
+  
+  # Water Alerts (informational, no confirmation)
+  water_usage:
+    acknowledge_alert: false  # Read-only
+    create_threshold: true  # Might affect automations
+    timeout_seconds: 120
+  
+  # ===== Low-Priority Confirmations (Usually Not Required) =====
+  
+  # Read-Only Operations (never require confirmation)
+  read_only:
+    query_home_assistant_states: false
+    list_calendar_events: false
+    search_library: false
+    query_maintenance_history: false
+    query_inventory: false
+  
+  # Safe Personal Updates (no confirmation)
+  personal_updates:
+    add_book_preference: false
+    add_reading_goal: false
+    update_dietary_preferences: false
+    add_to_reading_list: false
+
+# Confirmation Methods
+confirmation_methods:
+  cli_prompt:
+    # Interactive CLI confirmation
+    enabled: true
+    display_action_details: true
+    display_affected_resources: true
+    require_explicit_yes: true  # "yes" not just "y"
+    timeout_seconds: 300
+    retry_on_timeout: true
+    max_retries: 3
+  
+  async_approval:
+    # For remote approval (future feature)
+    enabled: false
+    store_pending_actions: true
+    expiration_seconds: 3600  # 1 hour
+
+# Confirmation Display Template
+# When CLI prompts for confirmation, display:
+display_template: |
+  ========================================
+  ACTION CONFIRMATION REQUIRED
+  ========================================
+  
+  Agent:        {agent_name}
+  Skill:        {skill_name}
+  Action:       {action_name}
+  
+  Details:      {action_details}
+  
+  Affected:     {affected_resources}
+  
+  Do you approve this action?
+  (Type 'yes' to proceed, 'no' to cancel)
+  
+  [Expires in {time_remaining} seconds]
+  ========================================
+
+# Confirmation Blocking
+# What happens when user denies confirmation
+on_confirmation_denied:
+  action_cancelled: true
+  log_to_audit: true
+  notify_agent: true
+  retry_allowed: false  # Agent must retry from scratch
+  notification_template: |
+    Action cancelled by user.
+    Skill: {skill_name}
+    Action: {action_name}
+    Time: {timestamp}
+
+# Confirmation Timeout
+# What happens when confirmation times out without user response
+on_confirmation_timeout:
+  action_cancelled: true
+  log_to_audit: true
+  notify_agent: true
+  retry_allowed: false
+  notification_template: |
+    Confirmation timeout after {timeout_seconds} seconds.
+    User did not respond. Action cancelled.
+    Skill: {skill_name}
+    Action: {action_name}
+
+# Bypass Conditions (when confirmation can be skipped)
+bypass_conditions:
+  # Note: These are future enhancements
+  skip_if_from_trusted_agent: false
+  skip_if_within_scheduled_window: false
+  skip_if_user_preferences_allow: false
+
+# Audit Trail
+audit_confirmation:
+  log_request: true
+  log_user_response: true
+  log_reasoning: true
+  log_result: true
